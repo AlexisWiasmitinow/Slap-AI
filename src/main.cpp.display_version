@@ -1,0 +1,180 @@
+/*
+ * WEMOS S3 MINI PRO - IMU Display Test
+ * 
+ * Reads QMI8658C IMU sensor data and displays it on the 0.85" TFT screen
+ * 
+ * Hardware:
+ * - ESP32-S3FH4R2
+ * - 0.85" 128x128 TFT Display (GC9107)
+ * - QMI8658C IMU Sensor
+ */
+
+#include <Arduino.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <TFT_eSPI.h>
+#include "QMI8658C.h"
+
+// Pin definitions
+#define IMU_SDA 6
+#define IMU_SCL 5
+#define TFT_BL  3
+#define LED_PWR 7
+#define LED_DATA 8
+
+// Create objects
+TFT_eSPI tft = TFT_eSPI();
+QMI8658C imu;
+
+// Update interval
+unsigned long lastUpdate = 0;
+const unsigned long updateInterval = 50; // 20Hz refresh rate
+
+void setup() {
+    // ESP32-S3 USB CDC initialization
+    Serial.begin(115200);
+    
+    // CRITICAL: Wait for USB CDC to be ready (up to 5 seconds)
+    unsigned long startTime = millis();
+    while (!Serial && (millis() - startTime < 5000)) {
+        delay(100);
+    }
+    delay(500); // Extra delay for stability
+    
+    // Send multiple newlines to ensure visibility
+    Serial.println("\n\n\n\n\n");
+    Serial.println("========================================");
+    Serial.println("=== WEMOS S3 MINI PRO - IMU Test ===");
+    Serial.println("========================================");
+    Serial.println("Starting initialization...");
+    
+    // Initialize LED power
+    pinMode(LED_PWR, OUTPUT);
+    digitalWrite(LED_PWR, LOW); // Turn off LED for now
+    Serial.println("LED power initialized");
+    
+    // Initialize TFT display
+    Serial.println("Initializing TFT display...");
+    Serial.println("Setting backlight pin HIGH...");
+    pinMode(TFT_BL, OUTPUT);
+    digitalWrite(TFT_BL, HIGH); // Turn on backlight
+    delay(100);
+    
+    Serial.println("Calling tft.init()...");
+    tft.init();
+    Serial.println("TFT init complete");
+    
+    Serial.println("Setting rotation...");
+    tft.setRotation(0);
+    
+    Serial.println("Filling screen with red (test)...");
+    tft.fillScreen(TFT_RED);  // Test with RED first to see if anything appears
+    delay(1000);
+    
+    Serial.println("Filling screen with black...");
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(1);
+    Serial.println("Display initialized!");
+    
+    // Display startup message
+    tft.setCursor(10, 10);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.println("WEMOS S3");
+    tft.setCursor(10, 25);
+    tft.println("IMU Test");
+    
+    delay(1000);
+    
+    // Initialize I2C for IMU
+    Serial.println("Initializing I2C...");
+    Wire.begin(IMU_SDA, IMU_SCL);
+    Wire.setClock(400000); // 400kHz I2C
+    
+    // Initialize IMU
+    Serial.println("Initializing QMI8658C IMU...");
+    tft.setCursor(10, 50);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.println("Init IMU...");
+    
+    if (!imu.begin(Wire)) {
+        Serial.println("ERROR: Failed to initialize IMU!");
+        tft.setCursor(10, 65);
+        tft.setTextColor(TFT_RED, TFT_BLACK);
+        tft.println("IMU FAIL!");
+        while (1) {
+            delay(1000);
+        }
+    }
+    
+    Serial.println("IMU initialized successfully!");
+    tft.setCursor(10, 65);
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.println("IMU OK!");
+    
+    delay(1000);
+    
+    // Clear screen and prepare for data display
+    tft.fillScreen(TFT_BLACK);
+    
+    // Draw static labels
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(5, 5);
+    tft.println("=== IMU DATA ===");
+    
+    // Accelerometer labels
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setCursor(5, 25);
+    tft.println("Accel (g):");
+    
+    // Gyroscope labels
+    tft.setCursor(5, 75);
+    tft.println("Gyro (d/s):");
+    
+    Serial.println("Setup complete! Starting main loop...");
+}
+
+void loop() {
+    unsigned long currentTime = millis();
+    
+    if (currentTime - lastUpdate >= updateInterval) {
+        lastUpdate = currentTime;
+        
+        // Update IMU data
+        imu.update();
+        IMUData data = imu.getData();
+        
+        // Print to serial
+        Serial.printf("Accel: X=%.3f Y=%.3f Z=%.3f | Gyro: X=%.2f Y=%.2f Z=%.2f | Temp=%.1f°C\n",
+                     data.accelX, data.accelY, data.accelZ,
+                     data.gyroX, data.gyroY, data.gyroZ,
+                     data.temperature);
+        
+        // Display accelerometer data
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setTextSize(1);
+        
+        tft.setCursor(5, 40);
+        tft.printf("X: %6.3f  ", data.accelX);
+        tft.setCursor(5, 50);
+        tft.printf("Y: %6.3f  ", data.accelY);
+        tft.setCursor(5, 60);
+        tft.printf("Z: %6.3f  ", data.accelZ);
+        
+        // Display gyroscope data
+        tft.setCursor(5, 90);
+        tft.printf("X: %7.2f  ", data.gyroX);
+        tft.setCursor(5, 100);
+        tft.printf("Y: %7.2f  ", data.gyroY);
+        tft.setCursor(5, 110);
+        tft.printf("Z: %7.2f  ", data.gyroZ);
+        
+        // Display temperature
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.setCursor(5, 120);
+        tft.printf("T: %.1fC  ", data.temperature);
+    }
+}
+
+
