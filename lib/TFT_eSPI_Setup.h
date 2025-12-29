@@ -1,5 +1,5 @@
-// Minimal TFT_eSPI setup for ESP32-S3 WEMOS S3 MINI PRO
-// Testing configuration
+// TFT_eSPI setup for ESP32-S3 WEMOS S3 MINI PRO
+// Correct pins from schematic (2024-06-21)
 
 #define USER_SETUP_INFO "User_Setup"
 
@@ -10,16 +10,16 @@
 #define TFT_WIDTH 128
 #define TFT_HEIGHT 128
 
-// Pins according to WEMOS S3 MINI PRO schematic
-#define TFT_MOSI 11
-#define TFT_SCLK 12
-#define TFT_CS   4
-#define TFT_DC   2
-#define TFT_RST  1
+// Pins from schematic - MCU page
+#define TFT_MOSI 38  // IO38/MOSI
+#define TFT_SCLK 40  // IO40/SCK
+#define TFT_CS   35  // TFT_CS/IO35
+#define TFT_DC   36  // TFT_DC/IO36
+#define TFT_RST  34  // TFT_RST/IO34
 
 // Frequencies
-#define SPI_FREQUENCY 20000000
-#define SPI_READ_FREQUENCY 10000000
+#define SPI_FREQUENCY 27000000
+#define SPI_READ_FREQUENCY 16000000
 
 // Fonts
 #define LOAD_GLCD
