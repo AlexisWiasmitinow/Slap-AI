@@ -56,6 +56,9 @@ void GC9A01A::begin(uint32_t freq) {
     writeCommand(GC9A01A_SLPOUT);
     delay(120);
     
+    writeCommand(0x21);  // Display Inversion ON - fixes inverted colors
+    delay(10);
+    
     writeCommand(GC9A01A_DISPON);
     delay(20);
     
