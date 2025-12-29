@@ -109,43 +109,62 @@ void loop() {
                      data.accelX, data.accelY, data.accelZ,
                      data.gyroX, data.gyroY, data.gyroZ);
         
-        // Display output
+        // Display output - clear old values first
         display.setTextSize(1);
         
-        // Title
-        display.setTextColor(CYAN);
-        display.setCursor(5, 5);
-        display.print("=== IMU DATA ===");
+        // Title (only draw once)
+        static bool firstDraw = true;
+        if (firstDraw) {
+            display.setTextColor(CYAN);
+            display.setCursor(5, 5);
+            display.print("=== IMU DATA ===");
+            
+            display.setTextColor(YELLOW);
+            display.setCursor(5, 25);
+            display.print("Accel (g):");
+            
+            display.setCursor(5, 75);
+            display.print("Gyro (d/s):");
+            
+            firstDraw = false;
+        }
         
-        // Accelerometer
-        display.setTextColor(YELLOW);
-        display.setCursor(5, 25);
-        display.print("Accel (g):");
-        
+        // Clear and draw accelerometer values
+        display.fillRect(0, 38, 128, 30, BLACK);  // Clear accel area
         display.setTextColor(WHITE);
         display.setCursor(5, 38);
-        display.print("X:"); display.print(data.accelX, 3);
+        display.print("X:");
+        display.print(data.accelX, 3);
+        
         display.setCursor(5, 48);
-        display.print("Y:"); display.print(data.accelY, 3);
+        display.print("Y:");
+        display.print(data.accelY, 3);
+        
         display.setCursor(5, 58);
-        display.print("Z:"); display.print(data.accelZ, 3);
+        display.print("Z:");
+        display.print(data.accelZ, 3);
         
-        // Gyroscope
-        display.setTextColor(YELLOW);
-        display.setCursor(5, 75);
-        display.print("Gyro (d/s):");
-        
+        // Clear and draw gyroscope values
+        display.fillRect(0, 88, 128, 30, BLACK);  // Clear gyro area
         display.setTextColor(WHITE);
         display.setCursor(5, 88);
-        display.print("X:"); display.print(data.gyroX, 2);
-        display.setCursor(5, 98);
-        display.print("Y:"); display.print(data.gyroY, 2);
-        display.setCursor(5, 108);
-        display.print("Z:"); display.print(data.gyroZ, 2);
+        display.print("X:");
+        display.print(data.gyroX, 2);
         
-        // Temperature
+        display.setCursor(5, 98);
+        display.print("Y:");
+        display.print(data.gyroY, 2);
+        
+        display.setCursor(5, 108);
+        display.print("Z:");
+        display.print(data.gyroZ, 2);
+        
+        // Clear and draw temperature
+        display.fillRect(0, 120, 128, 8, BLACK);  // Clear temp area
         display.setTextColor(GREEN);
         display.setCursor(5, 120);
-        display.print("T:"); display.print(data.temperature, 1); display.print("C");
+        display.print("T:");
+        display.print(data.temperature, 1);
+        display.print("C");
     }
 }
