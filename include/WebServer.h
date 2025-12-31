@@ -2,6 +2,7 @@
 #define WEBSERVER_H
 
 #include <WiFi.h>
+#include <Update.h>
 
 // Define HTTP methods if not already defined
 #ifndef HTTP_GET
@@ -202,6 +203,92 @@ private:
             color: #991b1b;
             display: block;
         }
+        .dropzone {
+            border: 3px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8fafc;
+            margin-bottom: 15px;
+        }
+        .dropzone:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+        .dropzone.dragover {
+            border-color: #667eea;
+            background: #e0e7ff;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            transform: scale(1.02);
+        }
+        .dropzone-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        .dropzone.dragover .dropzone-icon {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.7; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+        .dropzone-text {
+            color: #64748b;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+        .dropzone-hint {
+            color: #94a3b8;
+            font-size: 13px;
+        }
+        .progress-container {
+            display: none;
+            margin-top: 15px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .upload-status {
+            text-align: center;
+            margin-top: 15px;
+            padding: 12px;
+            font-size: 15px;
+            color: #64748b;
+            font-weight: 600;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .upload-status.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        .upload-status.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
     </style>
 </head>
 <body>
@@ -247,6 +334,22 @@ private:
             </div>
             <button class="button button-primary" onclick="saveWiFi()">Connect to WiFi</button>
             <button class="button button-danger" onclick="resetDevice()">Factory Reset</button>
+        </div>
+        
+        <div class="section">
+            <div class="section-title">🔄 Firmware Update</div>
+            <div class="dropzone" id="dropzone">
+                <div class="dropzone-icon">📦</div>
+                <div class="dropzone-text">Drop firmware here or click to select</div>
+                <div class="dropzone-hint">Drag .bin file or click to browse</div>
+            </div>
+            <input type="file" id="fileInput" accept=".bin" style="display: none;">
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">0%</div>
+                </div>
+                <div class="upload-status" id="uploadStatus">Uploading...</div>
+            </div>
         </div>
     </div>
     
@@ -359,6 +462,150 @@ private:
             }
         }
         
+        // Drag and drop functionality
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const uploadStatus = document.getElementById('uploadStatus');
+        
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropzone.addEventListener(eventName, () => {
+                dropzone.classList.add('dragover');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropzone.addEventListener(eventName, () => {
+                dropzone.classList.remove('dragover');
+            }, false);
+        });
+        
+        // Handle dropped files
+        dropzone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }, false);
+        
+        // Handle click to select file
+        dropzone.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        async function handleFile(file) {
+            if (!file.name.endsWith('.bin')) {
+                showMessage('Please select a .bin file', true);
+                return;
+            }
+            
+            // Show progress container
+            progressContainer.style.display = 'block';
+            dropzone.style.display = 'none';
+            
+            const formData = new FormData();
+            formData.append('firmware', file);
+            
+            try {
+                const xhr = new XMLHttpRequest();
+                
+                // Track upload progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        progressFill.style.width = percentComplete + '%';
+                        progressFill.textContent = percentComplete + '%';
+                        uploadStatus.textContent = 'Uploading... ' + Math.round(e.loaded / 1024) + ' KB / ' + Math.round(e.total / 1024) + ' KB';
+                        
+                        // When upload reaches 100%, show success immediately
+                        // (device will reboot before we get HTTP response)
+                        if (percentComplete === 100) {
+                            console.log('Upload 100% - Starting countdown...');
+                            progressFill.textContent = '✓ Complete';
+                            uploadStatus.className = 'upload-status success';
+                            
+                            // Countdown from 5 to 1
+                            let countdown = 5;
+                            uploadStatus.textContent = `✓ Upload complete! Device restarting... Page will reload in ${countdown} seconds.`;
+                            
+                            const countdownInterval = setInterval(() => {
+                                countdown--;
+                                if (countdown > 0) {
+                                    uploadStatus.textContent = `✓ Upload complete! Device restarting... Page will reload in ${countdown} second${countdown !== 1 ? 's' : ''}.`;
+                                } else {
+                                    uploadStatus.textContent = '✓ Reloading page now...';
+                                    clearInterval(countdownInterval);
+                                }
+                            }, 1000);
+                            
+                            setTimeout(() => {
+                                console.log('Reloading page...');
+                                window.location.reload();
+                            }, 5000);
+                        }
+                    }
+                });
+                
+                xhr.addEventListener('load', () => {
+                    console.log('Load event - Status:', xhr.status, 'Response:', xhr.responseText);
+                    // Success handling is done in progress event at 100%
+                    // This event might not fire if device reboots immediately
+                });
+                
+                xhr.addEventListener('error', () => {
+                    console.error('XHR Error event fired - upload failed');
+                    // Only show error if we haven't reached 100% yet
+                    if (!uploadStatus.classList.contains('success')) {
+                        uploadStatus.className = 'upload-status error';
+                        uploadStatus.textContent = '✗ Upload error - please try again';
+                        setTimeout(() => {
+                            resetUploadUI();
+                        }, 3000);
+                    }
+                });
+                
+                xhr.addEventListener('loadend', () => {
+                    console.log('LoadEnd event - Status:', xhr.status);
+                    // Connection closed - this is normal after device reboots
+                });
+                
+                xhr.open('POST', '/update');
+                xhr.send(formData);
+                
+            } catch (e) {
+                showMessage('Upload failed: ' + e.message, true);
+                resetUploadUI();
+            }
+        }
+        
+        function resetUploadUI() {
+            progressContainer.style.display = 'none';
+            dropzone.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressFill.textContent = '0%';
+            uploadStatus.className = 'upload-status';
+            uploadStatus.textContent = 'Uploading...';
+        }
+        
         // Load status on page load and refresh every 5 seconds
         loadStatus();
         setInterval(loadStatus, 5000);
@@ -455,6 +702,57 @@ public:
             delay(100);
             ESP.restart();
         });
+        
+        // OTA Update handler
+        server->on("/update", HTTP_POST, 
+            // Handle the response after upload completes
+            [](AsyncWebServerRequest *request) {
+                bool success = !Update.hasError();
+                
+                Serial.printf("OTA Upload complete. Success: %d\n", success);
+                
+                // Send response to browser
+                request->send(200, "text/plain", success ? "OK" : "FAIL");
+                
+                if (success) {
+                    Serial.println("OTA Update Success! Rebooting in 500ms...");
+                    // Delay to ensure response is sent before reboot
+                    delay(500);
+                    ESP.restart();
+                } else {
+                    Serial.println("OTA Update Failed!");
+                }
+            },
+            // Handle the upload data
+            [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+                if (!index) {
+                    Serial.printf("OTA Update Start: %s\n", filename.c_str());
+                    
+                    // Determine update type based on filename
+                    int cmd = (filename.indexOf("spiffs") > -1 || filename.indexOf("littlefs") > -1) 
+                        ? U_SPIFFS : U_FLASH;
+                    
+                    if (!Update.begin(UPDATE_SIZE_UNKNOWN, cmd)) {
+                        Update.printError(Serial);
+                    }
+                }
+                
+                // Write data chunk
+                if (len) {
+                    if (Update.write(data, len) != len) {
+                        Update.printError(Serial);
+                    }
+                }
+                
+                if (final) {
+                    if (Update.end(true)) {
+                        Serial.printf("OTA Update Success: %u bytes\n", index + len);
+                    } else {
+                        Update.printError(Serial);
+                    }
+                }
+            }
+        );
         
         // Start server
         server->begin();
